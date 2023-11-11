@@ -32,7 +32,7 @@ def get_published_posts(manager=Post.objects):
 def index(request):
     post_list = Post.published.select_related(
         'author', 'location', 'category'
-    ).order_by('-pub_date').filter(pub_date__lte=timezone.now()).annotate(comment_count=Count('comments'))
+    ).order_by('-pub_date').annotate(comment_count=Count('comments'))
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -42,9 +42,13 @@ def index(request):
 
 def post_detail(request, id):
     template = 'blog/detail.html'
-    post = get_object_or_404(
-        get_published_posts(), pk=id
-    )
+    post = get_object_or_404(Post, pk=id)
+    if request.user != post.author:
+        post = get_object_or_404(
+            get_published_posts(), pk=id
+        )
+    else:
+        post = post
     form = CommentForm(request.POST)
     context = {'post': post, 'form': form}
     comments = post.comments.all()
