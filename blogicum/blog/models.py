@@ -62,7 +62,8 @@ class Post(BaseModel):
     )
     author = models.ForeignKey(
         User, on_delete=models.CASCADE,
-        verbose_name='Автор публикации'
+        verbose_name='Автор публикации',
+        related_name='author_records',
     )
     location = models.ForeignKey(
         Location, on_delete=models.SET_NULL,
@@ -72,6 +73,7 @@ class Post(BaseModel):
         Category, on_delete=models.SET_NULL,
         null=True, verbose_name='Категория', related_name='categorized_records'
     )
+    image = models.ImageField('Фото', upload_to='posts_images', blank=True)
 
     class Meta:
         verbose_name = 'публикация'
@@ -80,3 +82,17 @@ class Post(BaseModel):
 
     def __str__(self):
         return self.title
+
+
+class Comment(models.Model):
+    text = models.TextField('Комментарий', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name='comments',
+    )
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ('created_at',)

@@ -4,12 +4,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-(oz*5o)kb(7z$49@q$kzoiyjso_$_ureg7nedp*l_^8ep)m9!w'
 
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
 ]
+
+CSRF_FAILURE_VIEW = 'pages.views.csrf_failure'
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -20,6 +22,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'pages.apps.PagesConfig',
     'blog.apps.BlogConfig',
+    'django_bootstrap5',
 ]
 
 MIDDLEWARE = [
@@ -35,6 +38,16 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'blogicum.urls'
 
 TEMPLATES_DIR = BASE_DIR / 'templates'
+
+LOGIN_REDIRECT_URL = 'blog:index'
+
+LOGIN_URL = 'login'
+
+MEDIA_ROOT = BASE_DIR / 'media'
+
+EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
+
+EMAIL_FILE_PATH = BASE_DIR / 'sent_emails'
 
 TEMPLATES = [
     {

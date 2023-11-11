@@ -1,7 +1,23 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
-from .models import Post, Category
-from .constans import LIMIT
+from .models import Post, Category, Comment
+from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
+from .forms import PostForm, EditProfileForm, EditPostForm, CommentForm
+from django.contrib.auth.decorators import login_required
+
+User = get_user_model()
+
+
+def profile(request, username):
+    template = 'blog/profile.html'
+    profile = get_object_or_404(User, username=username)
+    post = profile.author_records.all().order_by('-pub_date')
+    paginator = Paginator(post, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    context = {'profile': profile, 'post': post, 'page_obj': page_obj}
+    return render(request, template, context)
 
 
 def get_published_posts(manager=Post.objects):
@@ -13,12 +29,14 @@ def get_published_posts(manager=Post.objects):
 
 
 def index(request):
-    template = 'blog/index.html'
     post_list = Post.published.select_related(
         'author', 'location', 'category'
-    ).order_by('-pub_date')[:LIMIT]
-    context = {'post_list': post_list}
-    return render(request, template, context)
+    ).order_by('-pub_date').filter(pub_date__lte=timezone.now())
+    paginator = Paginator(post_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    context = {'page_obj': page_obj}
+    return render(request, 'blog/index.html', context)
 
 
 def post_detail(request, id):
@@ -26,7 +44,11 @@ def post_detail(request, id):
     post = get_object_or_404(
         get_published_posts(), pk=id
     )
-    context = {'post': post}
+    form = CommentForm(request.POST)
+    context = {'post': post, 'form': form}
+    comments = post.comments.all()
+    if comments:
+        context['comments'] = comments
     return render(request, template, context)
 
 
@@ -35,6 +57,96 @@ def category_posts(request, category_slug):
     category = get_object_or_404(
         Category, slug=category_slug, is_published=True
     )
-    post_list = get_published_posts(category.categorized_records.all())
-    context = {'post_list': post_list, 'category': category}
+    post_list = get_published_posts(category.categorized_records.all()).order_by('-pub_date')
+    paginator = Paginator(post_list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    context = {'post_list': post_list, 'category': category, 'page_obj': page_obj}
+    return render(request, template, context)
+
+
+@login_required
+def create_post(request):
+    form = PostForm(
+        request.POST or None, files=request.FILES or None
+    )
+    context = {'form': form}
+    if form.is_valid():
+        form.save()
+        return redirect('blog:profile', request.user.username)
+    return render(request, 'blog/create.html', context)
+
+
+@login_required
+def edit_profile(request):
+    user = get_object_or_404(User, pk=request.user.pk)
+    form = EditProfileForm(request.POST or None, instance=user)
+    context = {'form': form}
+    if form.is_valid():
+        form.save()
+    return render(request, 'blog/user.html', context)
+
+
+@login_required
+def edit_post(request, post_id):
+    template = 'blog/create.html'
+    post = get_object_or_404(Post, pk=post_id)
+    if request.user != post.author:
+        return redirect('blog:post_detail', post_id)
+    form = EditPostForm(request.POST or None, instance=post)
+    context = {'form': form}
+    if form.is_valid():
+        form.save()
+    return render(request, template, context)
+
+
+@login_required
+def add_comment(request, post_id):
+    post = get_object_or_404(Post, pk=post_id)
+    form = CommentForm(request.POST or None)
+    if form.is_valid():
+        comment = form.save(commit=False)
+        comment.author = request.user
+        comment.post = post
+        comment.save()
+    return redirect('blog:post_detail', post_id)
+
+
+def edit_comment(request, post_id, comment_id):
+    template = 'blog/comment.html'
+    comment = get_object_or_404(Comment, pk=comment_id)
+    form = CommentForm(request.POST or None, instance=comment)
+    context = {
+        'form': form,
+        'comment': comment,
+        'post_id': post_id
+    } # не понимаю что тут происходит
+    if form.is_valid():
+        form.save()
+    return render(request, template, context)
+
+
+def delete_post(request, post_id):
+    template = 'blog/create.html'
+    instance = get_object_or_404(Post, pk=post_id)
+    form = PostForm(instance=instance)
+    context = {'form': form}
+    if request.method == 'POST':
+        instance.delete()
+        return redirect('blog:index')
+    return render(request, template, context)
+
+
+def delete_comment(request, post_id, comment_id):
+    template = 'blog/comment.html'
+    instance = get_object_or_404(Comment, pk=comment_id)
+    form = CommentForm(instance=instance)
+    context = {
+        'form': form,
+        'comment': instance,
+        'post_id': post_id
+    }
+    if request.method == 'POST':
+        instance.delete()
+        return redirect('blog:index')
     return render(request, template, context)
