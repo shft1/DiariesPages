@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from .forms import PostForm, EditProfileForm, EditPostForm, CommentForm
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
 
 User = get_user_model()
 
@@ -12,7 +13,7 @@ User = get_user_model()
 def profile(request, username):
     template = 'blog/profile.html'
     profile = get_object_or_404(User, username=username)
-    post = profile.author_records.all().order_by('-pub_date')
+    post = profile.author_records.all().order_by('-pub_date').annotate(comment_count=Count('comments'))
     paginator = Paginator(post, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -31,7 +32,7 @@ def get_published_posts(manager=Post.objects):
 def index(request):
     post_list = Post.published.select_related(
         'author', 'location', 'category'
-    ).order_by('-pub_date').filter(pub_date__lte=timezone.now())
+    ).order_by('-pub_date').filter(pub_date__lte=timezone.now()).annotate(comment_count=Count('comments'))
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -57,7 +58,7 @@ def category_posts(request, category_slug):
     category = get_object_or_404(
         Category, slug=category_slug, is_published=True
     )
-    post_list = get_published_posts(category.categorized_records.all()).order_by('-pub_date')
+    post_list = get_published_posts(category.categorized_records.all()).order_by('-pub_date').annotate(comment_count=Count('comments'))
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -72,7 +73,9 @@ def create_post(request):
     )
     context = {'form': form}
     if form.is_valid():
-        form.save()
+        post = form.save(commit=False)
+        post.author = request.user
+        post.save()
         return redirect('blog:profile', request.user.username)
     return render(request, 'blog/create.html', context)
 
@@ -112,15 +115,18 @@ def add_comment(request, post_id):
     return redirect('blog:post_detail', post_id)
 
 
+@login_required
 def edit_comment(request, post_id, comment_id):
     template = 'blog/comment.html'
     comment = get_object_or_404(Comment, pk=comment_id)
+    if request.user != comment.author:
+        return redirect('blog:index')
     form = CommentForm(request.POST or None, instance=comment)
     context = {
         'form': form,
         'comment': comment,
         'post_id': post_id
-    } # не понимаю что тут происходит
+    }
     if form.is_valid():
         form.save()
     return render(request, template, context)
@@ -129,6 +135,8 @@ def edit_comment(request, post_id, comment_id):
 def delete_post(request, post_id):
     template = 'blog/create.html'
     instance = get_object_or_404(Post, pk=post_id)
+    if request.user != instance.author and request.user.is_superuser == False:
+        return redirect('blog:index')
     form = PostForm(instance=instance)
     context = {'form': form}
     if request.method == 'POST':
@@ -140,9 +148,9 @@ def delete_post(request, post_id):
 def delete_comment(request, post_id, comment_id):
     template = 'blog/comment.html'
     instance = get_object_or_404(Comment, pk=comment_id)
-    form = CommentForm(instance=instance)
+    if request.user != instance.author and request.user.is_superuser == False:
+        return redirect('blog:index')
     context = {
-        'form': form,
         'comment': instance,
         'post_id': post_id
     }
