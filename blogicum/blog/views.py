@@ -13,7 +13,9 @@ User = get_user_model()
 def profile(request, username):
     template = 'blog/profile.html'
     profile = get_object_or_404(User, username=username)
-    post = profile.author_records.all().order_by('-pub_date').annotate(comment_count=Count('comments'))
+    post = profile.author_records.all().order_by(
+        '-pub_date'
+    ).annotate(comment_count=Count('comments'))
     paginator = Paginator(post, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -62,11 +64,17 @@ def category_posts(request, category_slug):
     category = get_object_or_404(
         Category, slug=category_slug, is_published=True
     )
-    post_list = get_published_posts(category.categorized_records.all()).order_by('-pub_date').annotate(comment_count=Count('comments'))
+    post_list = get_published_posts(
+        category.categorized_records.all()
+    ).order_by('-pub_date').annotate(comment_count=Count('comments'))
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    context = {'post_list': post_list, 'category': category, 'page_obj': page_obj}
+    context = {
+        'post_list': post_list,
+        'category': category,
+        'page_obj': page_obj,
+    }
     return render(request, template, context)
 
 
@@ -139,7 +147,7 @@ def edit_comment(request, post_id, comment_id):
 def delete_post(request, post_id):
     template = 'blog/create.html'
     instance = get_object_or_404(Post, pk=post_id)
-    if request.user != instance.author and request.user.is_superuser == False:
+    if request.user != instance.author and not request.user.is_superuser:
         return redirect('blog:index')
     form = PostForm(instance=instance)
     context = {'form': form}
@@ -152,7 +160,7 @@ def delete_post(request, post_id):
 def delete_comment(request, post_id, comment_id):
     template = 'blog/comment.html'
     instance = get_object_or_404(Comment, pk=comment_id)
-    if request.user != instance.author and request.user.is_superuser == False:
+    if request.user != instance.author and not request.user.is_superuser:
         return redirect('blog:index')
     context = {
         'comment': instance,
