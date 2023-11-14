@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from .constans import max_len
+from .constans import MAX_LEN
 from .managers import PublishedManager
 
 
@@ -21,7 +21,7 @@ class BaseModel(models.Model):
 
 
 class Location(BaseModel):
-    name = models.CharField(max_length=max_len, verbose_name='Название места')
+    name = models.CharField(max_length=MAX_LEN, verbose_name='Название места')
 
     class Meta:
         verbose_name = 'местоположение'
@@ -33,7 +33,7 @@ class Location(BaseModel):
 
 
 class Category(BaseModel):
-    title = models.CharField(max_length=max_len, verbose_name='Заголовок')
+    title = models.CharField(max_length=MAX_LEN, verbose_name='Заголовок')
     description = models.TextField(verbose_name='Описание')
     slug = models.SlugField(
         unique=True, verbose_name='Идентификатор',
@@ -51,27 +51,26 @@ class Category(BaseModel):
 
 
 class Post(BaseModel):
-    objects = models.Manager()
-    published = PublishedManager()
-    title = models.CharField(max_length=max_len, verbose_name='Заголовок')
-    text = models.TextField(verbose_name='Текст')
-    pub_date = models.DateTimeField(
-        verbose_name='Дата и время публикации',
-        help_text='Если установить дату и время в '
-        'будущем — можно делать отложенные публикации.'
-    )
-    author = models.ForeignKey(
-        User, on_delete=models.CASCADE,
-        verbose_name='Автор публикации',
-        related_name='author_records',
-    )
     location = models.ForeignKey(
         Location, on_delete=models.SET_NULL,
         null=True, blank=True, verbose_name='Местоположение'
     )
     category = models.ForeignKey(
         Category, on_delete=models.SET_NULL,
-        null=True, verbose_name='Категория', related_name='categorized_records'
+        null=True, verbose_name='Категория',
+    )
+    author = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        verbose_name='Автор публикации',
+    )
+    objects = models.Manager()
+    published = PublishedManager()
+    title = models.CharField(max_length=MAX_LEN, verbose_name='Заголовок')
+    text = models.TextField(verbose_name='Текст')
+    pub_date = models.DateTimeField(
+        verbose_name='Дата и время публикации',
+        help_text='Если установить дату и время в '
+        'будущем — можно делать отложенные публикации.'
     )
     image = models.ImageField('Фото', upload_to='posts_images', blank=True)
 
@@ -79,20 +78,21 @@ class Post(BaseModel):
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
         ordering = ('id',)
+        default_related_name = 'connection'
 
     def __str__(self):
         return self.title
 
 
 class Comment(models.Model):
-    text = models.TextField('Комментарий', blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
         related_name='comments',
     )
     author = models.ForeignKey(User, on_delete=models.CASCADE)
+    text = models.TextField('Комментарий', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ('created_at',)

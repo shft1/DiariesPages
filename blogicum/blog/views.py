@@ -10,15 +10,20 @@ from django.db.models import Count
 User = get_user_model()
 
 
+def get_page_obj(request, list):
+    paginator = Paginator(list, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return page_obj
+
+
 def profile(request, username):
     template = 'blog/profile.html'
     profile = get_object_or_404(User, username=username)
-    post = profile.author_records.all().order_by(
+    post = profile.connection.all().order_by(
         '-pub_date'
     ).annotate(comment_count=Count('comments'))
-    paginator = Paginator(post, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_page_obj(request, post)
     context = {'profile': profile, 'post': post, 'page_obj': page_obj}
     return render(request, template, context)
 
@@ -35,9 +40,7 @@ def index(request):
     post_list = Post.published.select_related(
         'author', 'location', 'category'
     ).order_by('-pub_date').annotate(comment_count=Count('comments'))
-    paginator = Paginator(post_list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_page_obj(request, post_list)
     context = {'page_obj': page_obj}
     return render(request, 'blog/index.html', context)
 
@@ -65,11 +68,9 @@ def category_posts(request, category_slug):
         Category, slug=category_slug, is_published=True
     )
     post_list = get_published_posts(
-        category.categorized_records.all()
+        category.connection.all()
     ).order_by('-pub_date').annotate(comment_count=Count('comments'))
-    paginator = Paginator(post_list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_page_obj(request, post_list)
     context = {
         'post_list': post_list,
         'category': category,
