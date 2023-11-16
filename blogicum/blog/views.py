@@ -48,12 +48,11 @@ def index(request):
 
 def post_detail(request, id):
     template = 'blog/detail.html'
-    if request.user != get_object_or_404(Post, pk=id).author:
+    post = get_object_or_404(Post, pk=id)
+    if request.user != post.author:
         post = get_object_or_404(
             get_published_posts(), pk=id
         )
-    else:
-        post = get_object_or_404(Post, pk=id)
     form = CommentForm(request.POST)
     comments = post.comments.all()
     context = {'post': post, 'form': form, 'comments': comments}
