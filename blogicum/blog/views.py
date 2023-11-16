@@ -6,12 +6,13 @@ from django.core.paginator import Paginator
 from .forms import PostForm, EditProfileForm, EditPostForm, CommentForm
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
+from .constans import COUNT_POST
 
 User = get_user_model()
 
 
 def get_page_obj(request, list):
-    paginator = Paginator(list, 10)
+    paginator = Paginator(list, COUNT_POST)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     return page_obj
@@ -20,7 +21,7 @@ def get_page_obj(request, list):
 def profile(request, username):
     template = 'blog/profile.html'
     profile = get_object_or_404(User, username=username)
-    post = profile.connection.all().order_by(
+    post = profile.posts.all().order_by(
         '-pub_date'
     ).annotate(comment_count=Count('comments'))
     page_obj = get_page_obj(request, post)
@@ -47,18 +48,15 @@ def index(request):
 
 def post_detail(request, id):
     template = 'blog/detail.html'
-    post = get_object_or_404(Post, pk=id)
-    if request.user != post.author:
+    if request.user != get_object_or_404(Post, pk=id).author:
         post = get_object_or_404(
             get_published_posts(), pk=id
         )
     else:
-        post = post
+        post = get_object_or_404(Post, pk=id)
     form = CommentForm(request.POST)
-    context = {'post': post, 'form': form}
     comments = post.comments.all()
-    if comments:
-        context['comments'] = comments
+    context = {'post': post, 'form': form, 'comments': comments}
     return render(request, template, context)
 
 
@@ -68,7 +66,7 @@ def category_posts(request, category_slug):
         Category, slug=category_slug, is_published=True
     )
     post_list = get_published_posts(
-        category.connection.all()
+        category.posts.all()
     ).order_by('-pub_date').annotate(comment_count=Count('comments'))
     page_obj = get_page_obj(request, post_list)
     context = {
@@ -85,12 +83,13 @@ def create_post(request):
         request.POST or None, files=request.FILES or None
     )
     context = {'form': form}
-    if form.is_valid():
+    if not form.is_valid():
+        return render(request, 'blog/create.html', context)
+    else:
         post = form.save(commit=False)
         post.author = request.user
         post.save()
         return redirect('blog:profile', request.user.username)
-    return render(request, 'blog/create.html', context)
 
 
 @login_required
@@ -120,12 +119,14 @@ def edit_post(request, post_id):
 def add_comment(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
     form = CommentForm(request.POST or None)
-    if form.is_valid():
+    if not form.is_valid():
+        return redirect('blog:post_detail', post_id)
+    else:
         comment = form.save(commit=False)
         comment.author = request.user
         comment.post = post
         comment.save()
-    return redirect('blog:post_detail', post_id)
+        return redirect('blog:post_detail', post_id)
 
 
 @login_required

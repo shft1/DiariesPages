@@ -51,6 +51,7 @@ class Category(BaseModel):
 
 
 class Post(BaseModel):
+
     location = models.ForeignKey(
         Location, on_delete=models.SET_NULL,
         null=True, blank=True, verbose_name='Местоположение'
@@ -63,8 +64,10 @@ class Post(BaseModel):
         User, on_delete=models.CASCADE,
         verbose_name='Автор публикации',
     )
+
     objects = models.Manager()
     published = PublishedManager()
+
     title = models.CharField(max_length=MAX_LEN, verbose_name='Заголовок')
     text = models.TextField(verbose_name='Текст')
     pub_date = models.DateTimeField(
@@ -78,7 +81,7 @@ class Post(BaseModel):
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
         ordering = ('id',)
-        default_related_name = 'connection'
+        default_related_name = 'posts'
 
     def __str__(self):
         return self.title
@@ -88,7 +91,6 @@ class Comment(models.Model):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='comments',
     )
     author = models.ForeignKey(User, on_delete=models.CASCADE)
     text = models.TextField('Комментарий', blank=True)
@@ -96,3 +98,4 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ('created_at',)
+        default_related_name = 'comments'
